@@ -1,5 +1,5 @@
 library(dplyr)
-data <- read.csv("/home/naksh/Documents/DA/asst1/athlete_events.csv")
+data <- read.csv("athlete_events.csv")
 
 # Problem Statement 1
 retval <- subset( data, Team=="India")
