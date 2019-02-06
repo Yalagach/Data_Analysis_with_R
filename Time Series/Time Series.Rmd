@@ -1,0 +1,162 @@
+---
+title: "Time Series"
+output:
+  pdf_document: default
+  html_document: default
+---
+```{r setup, include=FALSE}
+library(Metrics)
+require(graphics)
+require(zoo)
+require(ggplot2)
+library(tseries)
+library(graphics)
+library(forecast)
+data<- read.csv("StockTrain.csv")
+test<-read.csv("StockTest.csv")
+test_close<-ts(test$close,frequency=3)
+plot.ts(data$close, ylab="Close Price")
+```
+```{r moving average 4}
+ win_4<-rollapply(zoo(data$close), width = 4, FUN = mean, align = "left")
+plot.ts(win_4,col='red', main="plot of smoothed close(4)")
+lines(data$close, col='black')
+legend("topleft",legend=c("close","rolling mean-4"),col=c("black","red"), lty=1:1)
+```
+```{r moving average 7}
+win_7<-rollapply(zoo(data$close), width = 7, FUN = mean, align = "left")
+plot.ts(win_7,col='red', main="plot of smoothed close(7)")
+lines(data$close, col='black')
+legend("topleft",legend=c("close","rolling mean-7"),col=c("black","red"), lty=1:1)
+```
+```{r moving average 14}
+ win_14<-rollapply(zoo(data$close), width = 14, FUN = mean, align = "left")
+plot.ts(win_14,col='red', main="plot of smoothed close(14)")
+lines(data$close, col='black')
+legend("topleft",legend=c("close","rolling mean-14"),col=c("black","red"), lty=1:1)
+```
+```{r Question 2 comparison plot}
+ plot.ts(data$close,col='red', main="Smoothening of close price")
+  lines(win_4, col='green')
+  lines(win_7, col='blue')
+  lines(win_14, col='black')
+legend("topleft",legend=c("close","rolling mean-4","rolling mean-7","rolling mean-14"),col=c("red","green","blue","black"), lty=1:1)
+```
+
+
+When actual close values are plotted against data smoothed with window size=4,there still appears to be quite a lot of random fluctuations in the time series and it looks similar to actal data plotted.Thus, to estimate the trend component more accurately, we might want to try smoothing the data with a simple moving average of a higher order. When we go for wndow size=7 it shows better results but it can still be more accurately smoothed. Thus with window size=14, we see that most of the random fluctuations are gone and it gives a clearer picture of the trend component.
+
+```{r Question 2 decompose 16}
+d16 = ts(data$close, frequency = 16)
+decompose_d16= decompose(d16, "additive")
+plot(decompose_d16)	
+```
+
+
+```{r QUESTION 2 decompose 80}
+ d80 = ts(data$close, frequency = 80)
+decompose_d80= decompose(d80, "additive")
+plot(decompose_d80)	
+```
+
+```{r QUESTION 2 decompose 200}
+d200 = ts(data$close, frequency = 200)
+decompose_d200= decompose(d200, "additive")
+plot(decompose_d200)
+```
+
+We can observe that smaller frequencies show smaller trends while higher frequency are not able to capture the trends and the pattern.Hence,smaller frequency may show smaller seasonal pattern and larger one shows larger seasonal pattern. So, the frequency 80 shows almost appropriate seasonality 
+
+The right seasonality of this time series seems to be represented with the frequency 80.
+
+
+a) (i) Is the Closing price a stationary time series? Perform Augmented Dickey Fuller test to verify.
+```{r Question 3 adf}
+adf<-adf.test(data$close)
+print(adf)
+print(adf$p.value)
+```
+ The value of p is >0.05  i.e 0.5749541 which is very high ,so we reject null hypothesis.We can conclude that there is a unit root and the time series is non stationary.
+Since non stationary we make the closing price stationary by performing ordered differences and see if the differenced field is stationary or not
+
+#3 a)If not, convert to stationary using ordered differences.
+```{r Question 3 ordered difference}
+stat<-diff(data$close, lag = 1, differences = 1)
+new_adf<-adf.test(stat)
+print(new_adf)
+print(new_adf$p.value)
+```
+
+#Remove Seasonality: Quaterly analysis hence frequency=3
+```{r QUESTION 3 removing seasonality}
+d90 = ts(data$close, frequency = 3)
+decompose_d90= decompose(d90, "additive")
+non_seasonal=data$close-decompose_d90$seasonal
+```
+
+``` {r QUESTION 3 ACF}
+acf(diff(non_seasonal))
+```
+
+No difference can be observed in the ACF graph hence an ACF is plotted after doing first order difference of the data.
+```{r QUESTION 3 PACF}
+pacf(diff(non_seasonal))
+```
+
+#the best parameter for SARIMAX model for the AIC metric.
+```{r QUESTION 3 best parameter}
+arima_fit<-auto.arima(non_seasonal,trace=TRUE)
+summary(arima_fit)
+```
+
+Different AIC values will be produced for different combinations of p,d,q values.Amongst them the combination of p,d,q with least AIC is the best paarmeter.
+The best paarmeter is given by summary. Best model: ARIMA(1,1,0)(1,0,1)[3]                    and AIC=2643.95  
+Training RMSE is 5.362556
+
+```{r Question 3 plotting forecast}
+pred<- forecast((test_close))
+plot(pred)
+```
+
+b) Make comments on the predictions.Did your model perform as per expectations, and why/why not?")
+ARIMAX model captured the seasonality well but the trend doesn't seems to be upto the mark.
+RMSE value is low. Model has exhibited a tendency to predict values around the center of the test data rather than the peaks seen in the data.
+Thus we cannot conclude that lower RMSE values indicate correctness of model. There is need for visual and manual visualization
+
+```{r QUESTION 4 a}
+train <-data
+
+model1 <- lm(close ~ volume+open+high+low, data=train)
+print("summary statistics of first model")
+print(summary(model1))
+print('In analysing summary of model1 all the features except volume are important')
+```
+
+feature engineering of 2 new features
+Feature 1: stock prediction can not be done only by closing price. It can depend on skewness hence the new metric with which we are forecasting is high-low/open
+Feature 2: Stock prediction is done with new metric high-low/volume
+
+```{r QUESTION 4 b}
+train <- cbind(train, (train$high - train$low) / train$open)
+colnames(train)[7] <- "new_feature1"
+train <- cbind(train, ((train$high - train$low) / train$volume) * 10^7)
+colnames(train)[8] <- "new_feature2"
+
+test <- cbind(test, (test$high - test$low) / test$open)
+colnames(test)[7] <- "new_feature1"
+test <- cbind(test, ((test$high - test$low) / test$volume) * 10^7)
+colnames(test)[8] <- "new_feature2"
+
+
+#part_b
+model2 <- lm(close ~ open+high+low+new_feature1+new_feature2, data=train)
+
+preds_train <- predict.lm(model2, train[, c(4,5,6,7,8)])
+print('RMSE for the new model on train data : ')
+print(rmse(train$close, preds_train))
+
+preds_test <- predict.lm(model2, test[, c(4,5,6,7,8)])
+print('RMSE for the new model on test data : ')
+print(rmse(test$close, preds_test))
+```
+
