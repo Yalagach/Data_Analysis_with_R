@@ -13,14 +13,14 @@ sum<-distinct(new, Year ,Sport)
 print(count(sum)) 
 
 all<-subset(retval,Medal!="NA")
-if(FALSE){
+
 med<-distinct(all,Year,Sport)
 all_med<-(count(med,Sport))
 print(all_med)
 high<-max(all_med$n)
 print(high)
 s<-subset(all_med$Sport,n==high)
-print(s)}
+print(s)
 
 medalwin<-subset(retval,Medal!="NA")
 print(tail(names(sort(table(all$Sport))),n=1)) 
